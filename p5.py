@@ -1,5 +1,5 @@
 import json
-from collections import namedtuple, Counter
+from collections import namedtuple, Counter, defaultdict
 import astar
 
 Recipe = namedtuple('Recipe', ['name', 'check', 'effect', 'cost'])
@@ -38,6 +38,11 @@ class Crafting:
 	def Items(cls):
 		instance = cls.GetInstance()
 		return instance.Items
+
+	@classmethod
+	def Recipes(cls):
+		instance = cls.GetInstance()
+		return instance.Recipes
 
 	@classmethod
 	def Initial(cls):
@@ -93,6 +98,31 @@ class State():
 			next.inventory[name] += amount
 		return next
 
+
+def make_RIKLS_heuristic():
+	# discourage states with more than the necessary amount of items in inventory
+
+	maximums = defaultdict(lambda: 1)
+
+	for name, rule in Crafting.Recipes().items():
+		products = rule.get('Produces', {})
+		ingredients = rule.get('Consumes', {})
+		for item, amount in products.items():
+			maximums[item] = max(maximums[item], 2 * amount)
+		for item, amount in ingredients.items():
+			maximums[item] = max(maximums[item], 2 * amount)
+
+	# print maximums
+
+
+	def RIKLS_heuristic(state):
+		for item, amount in state.inventory.items():
+			if amount >= maximums[item]:
+				return float("inf")
+		return 0
+
+	return RIKLS_heuristic
+
 # Return a function that checks whether a recipe can be used at a given state
 def make_checker(rule):
 	# This runs once per recipe
@@ -137,9 +167,9 @@ def make_goal_checker(goal):
 	return is_goal
 
 init = {}
-fin = {'wooden_pickaxe': 1}
+fin = {'stone_pickaxe': 1}
 
 start = make_initial_state(init)
 is_goal = make_goal_checker(fin)
 
-print astar.search(Crafting.Graph(), start, is_goal, 35)
+print astar.search(Crafting.Graph(), start, is_goal, 35, make_RIKLS_heuristic())
