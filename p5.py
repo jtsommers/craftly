@@ -6,7 +6,7 @@ all_recipes = []
 
 # Return a function that checks whether a recipe can be used at a given state
 def make_checker(rule):
-	# This runs once
+	# This runs once per recipe
 	# Write a checker function that examines rule['Consumes'] and rule['Requires']
 	def check(state):
 		# This runs a lot
@@ -17,14 +17,21 @@ def make_checker(rule):
 
 # Return a function that generates the next state for a given recipe
 def make_effector(rule):
-	# This runs once
-	# Write an effector function that examines rule['Consumes'] and rule['Requires']
+	# This runs once per recipe
+	# Write an effector function that examines rule['Consumes'] and rule['Produces']
 	def effect(state):
 		# This runs a lot
 		# Should return the next state
 		return state
 
 	return effect
+
+
+# An adjacency function for traversing a recipe state
+def graph(state):
+	for r in all_recipes:
+		if r.check(state):
+			yield (r.name, r.effect(state), r.cost)
 
 # Parse json into python
 # Crafting = {"Initial": {}, "Goal":{}, "Items":[], "Recipes":{}}
