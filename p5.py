@@ -69,13 +69,14 @@ class State():
 	"""An inventory state for the craftly minecraft crafting planner"""
 	def __init__(self, inventory):
 		self.inventory = Counter(inventory)
+		self.update()
 		
 	def __hash__(self):
-		return frozenset(self.inventory.items()).__hash__()
-		# return tuple(self.inventory.get(name, 0) for i,name in enumerate(Crafting.Items())).__hash__()
+		# return frozenset(self.inventory.items()).__hash__()
+		return self.hash
 
 	def __eq__(self, other):
-		return self.__hash__() is other.__hash__()
+		return self.hash is other.hash
 
 	def __str__(self):
 		return self.inventory.__str__()
@@ -90,12 +91,16 @@ class State():
 				return False
 		return True
 
+	def update(self):
+		self.hash = tuple(self.inventory.get(name, 0) for i,name in enumerate(Crafting.Items())).__hash__()
+
 	def next_state(self, consumes, produces):
 		next = State(self.inventory)
 		for name, amount in consumes.items():
 			next.inventory[name] -= amount
 		for name, amount in produces.items():
 			next.inventory[name] += amount
+		next.update()
 		return next
 
 
