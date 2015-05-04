@@ -107,22 +107,32 @@ class State():
 def make_RIKLS_heuristic():
 	# discourage states with more than the necessary amount of items in inventory
 
-	maximums = defaultdict(lambda: 1)
+	maximums = {}
+	consumes = defaultdict(lambda: 1)
+	produces = defaultdict(lambda: 0)
 
 	for name, rule in Crafting.Recipes().items():
 		products = rule.get('Produces', {})
 		ingredients = rule.get('Consumes', {})
 		for item, amount in products.items():
-			maximums[item] = max(maximums[item], 2 * amount)
+			produces[item] = max(amount, produces[item])
 		for item, amount in ingredients.items():
-			maximums[item] = max(maximums[item], 2 * amount)
+			consumes[item] = max(amount, consumes[item])
+
+	# Calculate maximums based on production/consumption
+	for item in produces: # This should cover all the items as you can start from scratch to obtain anything
+		p = produces[item]
+		c = consumes[item]
+		# print item, p, c
+		# If current inventory is one less than required consumption, we would have to produce another batch
+		maximums[item] = p + c - 1
 
 	# print maximums
 
 
 	def RIKLS_heuristic(state):
 		for item, amount in state.inventory.items():
-			if amount >= maximums[item]:
+			if amount > maximums[item]:
 				return float("inf")
 		return 0
 
