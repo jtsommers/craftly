@@ -15,6 +15,7 @@ def null_heuristic(state):
 # Generic A* search
 # TODO: use limit
 def search(graph, initial, is_goal, limit, heuristic=null_heuristic):
+	global end_state
 	# Initialization
 	frontier = Q.PriorityQueue()
 	# Save out a sequence of states to the goal
@@ -38,6 +39,10 @@ def search(graph, initial, is_goal, limit, heuristic=null_heuristic):
 			debug("Search stop, limit(", limit,") reached")
 			break
 
+		# print "==="
+		# print current_state, priority, cost_so_far[current_state]
+		# print "==="
+
 		# Traverse the adjacent nodes
 		for action, next_state, cost in graph(current_state):
 			new_cost = cost_so_far[current_state] + cost
@@ -46,12 +51,16 @@ def search(graph, initial, is_goal, limit, heuristic=null_heuristic):
 				previous[next_state] = current_state
 				action_to_state[next_state] = action
 				priority = new_cost + heuristic(next_state)
-				frontier.put((priority, next_state))
+				if priority < limit:
+					frontier.put((priority, next_state))
+					# print action
+					# print next_state, priority
 
 	# Build up the plan
 	plan = []
 	total_cost = float("inf")
 	if is_goal(current_state):
+		end_state = current_state
 		total_cost = cost_so_far[current_state]
 		while previous[current_state]:
 			plan.append(action_to_state[current_state])
