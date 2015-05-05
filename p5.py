@@ -5,6 +5,52 @@ import astar
 Recipe = namedtuple('Recipe', ['name', 'check', 'effect', 'cost'])
 all_recipes = []
 
+# Create a function to check whether a given state has the tools necessary to create a complex item
+# It doesn't check consumable resources since using up resources could be considered progress toward the goal
+def create_tool_check(items):
+	# items is list of lists
+	# Recurse once to add a second layer of prerequisites
+	# This will count some tools multiple times, but give them a higher weight because each is used for multiple recipes
+	extra_items = []
+	for req_list in items:
+		extra_items.extend(tool_reqs.get(req_list[0], []))
+	items.extend(extra_items)
+
+	def tool_check(state):
+		inventory = state.inventory
+		tools_needed = len(items)
+		for item_options in items:
+			for item in inventory:
+				if item in item_options:
+					# A sufficient tool was found in the inventory check next tool tuple
+					tools_needed -= 1
+					break
+		return tools_needed
+	return tool_check
+
+
+# Mapping from items that require tools to create to the tools necessary to make them
+tool_reqs = { 
+	"cart":[("wooden_pickaxe", "stone_pickaxe", "iron_pickaxe"),("bench"),("furnace")], 
+	"coal":[("stone_pickaxe", "iron_pickaxe")],
+	"cobble":[("wooden_pickaxe", "stone_pickaxe", "iron_pickaxe")], 
+	"furnace":[("wooden_pickaxe", "stone_pickaxe", "iron_pickaxe"),("bench")], 
+	"ingot":[("stone_pickaxe", "iron_pickaxe"),("furnace")], 
+	"iron_axe":[("stone_pickaxe", "iron_pickaxe"),("furnace"),("bench")], 
+	"iron_pickaxe":[("stone_pickaxe", "iron_pickaxe"),("furnace"),("bench")], 
+	"ore":[("stone_pickaxe", "iron_pickaxe")],  
+	"rail":[("stone_pickaxe", "iron_pickaxe"),("furnace"),("bench")], 
+	"stone_axe":[("wooden_pickaxe", "stone_pickaxe", "iron_pickaxe"),("bench")], 
+	"stone_pickaxe":[("wooden_pickaxe", "stone_pickaxe", "iron_pickaxe"),("bench")], 
+	"wooden_axe":[("bench")], 
+	"wooden_pickaxe":[("bench")]
+}
+
+# Create a function for checking a state for tools still needed for that item
+tool_check = {}
+for item in tool_reqs:
+	tool_check[item] = create_tool_check(tool_reqs[item])
+
 class Crafting:
 	instance = None
 	"""A crafting module that defines recipes and items"""
@@ -20,6 +66,7 @@ class Crafting:
 		self.Goal = crafting_data['Goal']
 		self.Recipes = crafting_data['Recipes']
 		self.all_recipes = []
+		self.product_ingredients = defaultdict(lambda:{})
 
 		# Load in the recipe rules
 		for name, rule in crafting_data['Recipes'].items():
@@ -27,6 +74,12 @@ class Crafting:
 			effector = make_effector(rule)
 			recipe = Recipe(name, checker, effector, rule['Time'])
 			self.all_recipes.append(recipe)
+			# Add to a reference of materials required for a product
+			for item, amount in rule.get('Produces', {}).items():
+				reqs = rule.get('Consumes', {})
+				self.product_ingredients[item] = reqs
+
+		print self.product_ingredients
 
 	@classmethod
 	def GetInstance(cls):
@@ -62,6 +115,11 @@ class Crafting:
 				if r.check(state):
 					yield (r.name, r.effect(state), r.cost)
 		return graph
+
+	@classmethod
+	def RequirementsForItem(cls, item):
+		instance = cls.GetInstance()
+
 
 		
 
@@ -141,18 +199,36 @@ def make_RIKLS_heuristic(goal):
 		c = consumes[item]
 		# print item, p, c
 		# If current inventory is one less than required consumption, we would have to produce another batch
-		maximums[item] = p + c - 1
+		maximums[item] = p + max(c, goal.inventory[item]) - 1
 
-	# print maximums
+	print maximums
 
 
 	def RIKLS_heuristic(state):
-		for item, amount in state.inventory.items():
+		tool_counter = 0
+		ingredient_counter = 0
+		for item in state.inventory:
+			amount = state.inventory[item]
 			if amount > maximums[item]:
 				return float("inf")
-		return 0
+
+		# Doesn't help enough yet
+		for item in goal.inventory:
+			tool_counter += tool_check.get(item, lambda:0)(state)
+			goal_ingredients = Crafting.GetInstance().product_ingredients[item]
+			ingredient_counter += state.get_important_item_count(goal_ingredients)
+		
+		if tool_counter > 0:
+			return 10*tool_counter
+		elif not is_goal(state):
+			return ingredient_counter * 2
+		else:
+			return 0
 
 	return RIKLS_heuristic
+
+def make_goal_heuristic(goal):
+	pass
 
 # Return a function that checks whether a recipe can be used at a given state
 def make_checker(rule):
@@ -204,4 +280,5 @@ start = make_initial_state(init)
 end = make_initial_state(fin)
 is_goal = make_goal_checker(fin)
 
-print astar.search(Crafting.Graph(), start, is_goal, 35, make_RIKLS_heuristic())
+print astar.search(Crafting.Graph(), start, is_goal, 1000, make_RIKLS_heuristic(end))
+
