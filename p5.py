@@ -17,7 +17,7 @@ def create_tool_check(items):
 	items.extend(extra_items)
 
 	def tool_check(state):
-		inventory = state.inventory
+		inventory = dict(state)
 		tools_needed = len(items)
 		for item_options in items:
 			for item in inventory:
@@ -199,7 +199,7 @@ def make_RIKLS_heuristic(goal):
 		# print item, p, c
 		# If current inventory is one less than required consumption, we would have to produce another batch
 		# maximums[item] = p + max(c, goal.inventory[item]) - 1
-		maximums[item] = p + c - 1
+		maximums[item] = p + max(c, goal.get(item, 0)) - 1
 
 	print maximums
 
@@ -210,20 +210,20 @@ def make_RIKLS_heuristic(goal):
 		for item, amount in state:
 			if amount > maximums[item]:
 				return float("inf")
+		return 0
 
 		# Doesn't help enough yet
-		# for item in goal.inventory:
-		# 	tool_counter += tool_check.get(item, lambda:0)(state)
-		# 	goal_ingredients = Crafting.GetInstance().product_ingredients[item]
-		# 	ingredient_counter += state.get_important_item_count(goal_ingredients)
+		for item in goal:
+			tool_counter += tool_check.get(item, lambda:0)(state)
+			goal_ingredients = Crafting.GetInstance().product_ingredients[item]
+			# ingredient_counter += state.get_important_item_count(goal_ingredients)
 		
-		# if tool_counter > 0:
-		# 	return 10*tool_counter
+		if tool_counter > 0:
+			return 10*tool_counter
 		# elif not is_goal(state):
 		# 	return ingredient_counter * 2
-		# else:
-		# 	return 0
-		return 0
+		else:
+			return 0
 
 	return RIKLS_heuristic
 
@@ -248,5 +248,5 @@ start = make_initial_state(init)
 end = make_initial_state(fin)
 is_goal = make_goal_checker(fin)
 
-print astar.search(Crafting.Graph(), start, is_goal, 1000, make_RIKLS_heuristic(end))
+print astar.search(Crafting.Graph(), start, is_goal, 1000, make_RIKLS_heuristic(fin))
 
