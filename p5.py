@@ -214,7 +214,7 @@ def make_RIKLS_heuristic(goal):
 
 		# Doesn't help enough yet
 		for item in goal.inventory:
-			tool_counter += tool_check.get(item, lambda:0)(state)
+			tool_counter += tool_check.get(item, lambda x:0)(state)
 			goal_ingredients = Crafting.GetInstance().product_ingredients[item]
 			ingredient_counter += state.get_important_item_count(goal_ingredients)
 		
