@@ -16,6 +16,7 @@ def null_heuristic(state):
 # TODO: use limit
 def search(graph, initial, is_goal, limit, heuristic=null_heuristic):
 	global end_state
+	end_state = initial
 	# Initialization
 	frontier = Q.PriorityQueue()
 	# Save out a sequence of states to the goal

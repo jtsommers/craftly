@@ -16,12 +16,15 @@ def create_tool_check(items):
 		extra_items.extend(tool_reqs.get(req_list[0], []))
 	items.extend(extra_items)
 
+	# print "Required Items: ", items
+
 	def tool_check(state):
 		inventory = dict(state)
+		# print "Inventory ", inventory
 		tools_needed = len(items)
 		for item_options in items:
-			for item in inventory:
-				if item in item_options:
+			for item in item_options:
+				if inventory[item] > 0:
 					# A sufficient tool was found in the inventory check next tool tuple
 					tools_needed -= 1
 					break
@@ -31,19 +34,19 @@ def create_tool_check(items):
 
 # Mapping from items that require tools to create to the tools necessary to make them
 tool_reqs = { 
-	"cart":[("wooden_pickaxe", "stone_pickaxe", "iron_pickaxe"),("bench"),("furnace")], 
+	"cart":[("wooden_pickaxe", "stone_pickaxe", "iron_pickaxe"),("bench",),("furnace",)], 
 	"coal":[("stone_pickaxe", "iron_pickaxe")],
 	"cobble":[("wooden_pickaxe", "stone_pickaxe", "iron_pickaxe")], 
-	"furnace":[("wooden_pickaxe", "stone_pickaxe", "iron_pickaxe"),("bench")], 
-	"ingot":[("stone_pickaxe", "iron_pickaxe"),("furnace")], 
-	"iron_axe":[("stone_pickaxe", "iron_pickaxe"),("furnace"),("bench")], 
-	"iron_pickaxe":[("stone_pickaxe", "iron_pickaxe"),("furnace"),("bench")], 
+	"furnace":[("wooden_pickaxe", "stone_pickaxe", "iron_pickaxe"),("bench",)], 
+	"ingot":[("stone_pickaxe", "iron_pickaxe"),("furnace",)], 
+	"iron_axe":[("stone_pickaxe", "iron_pickaxe"),("furnace",),("bench",)], 
+	"iron_pickaxe":[("stone_pickaxe", "iron_pickaxe"),("furnace",),("bench",)], 
 	"ore":[("stone_pickaxe", "iron_pickaxe")],  
-	"rail":[("stone_pickaxe", "iron_pickaxe"),("furnace"),("bench")], 
-	"stone_axe":[("wooden_pickaxe", "stone_pickaxe", "iron_pickaxe"),("bench")], 
-	"stone_pickaxe":[("wooden_pickaxe", "stone_pickaxe", "iron_pickaxe"),("bench")], 
-	"wooden_axe":[("bench")], 
-	"wooden_pickaxe":[("bench")]
+	"rail":[("stone_pickaxe", "iron_pickaxe"),("furnace",),("bench",)], 
+	"stone_axe":[("wooden_pickaxe", "stone_pickaxe", "iron_pickaxe"),("bench",)], 
+	"stone_pickaxe":[("wooden_pickaxe", "stone_pickaxe", "iron_pickaxe"),("bench",)], 
+	"wooden_axe":[("bench",)], 
+	"wooden_pickaxe":[("bench",)]
 }
 
 # Create a function for checking a state for tools still needed for that item
@@ -176,6 +179,13 @@ def has_items(state, items):
 def next_state(state, produces, consumes):
 	return magic_box(dict(state), produces, consumes)
 
+def get_important_item_count(inventory, goalInv):
+		total_items_remaining = 0
+		for item in goalInv:
+			# TODO/thought: maybe max isn't necessary and a negative count would incentivize minimum viable inventory
+			total_items_remaining += max(goalInv[item] - inventory[item], 0)
+		return total_items_remaining
+
 
 def make_RIKLS_heuristic(goal):
 	# discourage states with more than the necessary amount of items in inventory
@@ -202,7 +212,7 @@ def make_RIKLS_heuristic(goal):
 		maximums[item] = p + max(c, goal.get(item, 0)) - 1
 
 	print maximums
-
+	debug = {}
 
 	def RIKLS_heuristic(state):
 		tool_counter = 0
@@ -210,18 +220,29 @@ def make_RIKLS_heuristic(goal):
 		for item, amount in state:
 			if amount > maximums[item]:
 				return float("inf")
-		return 0
+		# return 0
 
 		# Doesn't help enough yet
 		for item in goal:
 			tool_counter += tool_check.get(item, lambda x:0)(state)
-			goal_ingredients = Crafting.GetInstance().product_ingredients[item]
-			# ingredient_counter += state.get_important_item_count(goal_ingredients)
 		
 		if tool_counter > 0:
-			return 10*tool_counter
-		# elif not is_goal(state):
-		# 	return ingredient_counter * 2
+			# print tool_counter
+			return 20*tool_counter
+		elif not is_goal(state):
+			inventory = dict(state)
+			# Take a look at the first state to reach all the necessary tools
+			if "transitioned" not in debug:
+				print "TRANSITIONED TO ITEM INSPECTION"
+				print "State for transition: ", state
+				debug["transitioned"] = True
+			for item in goal:
+				if not has_items(state, {item:goal[item]}):
+					goal_ingredients = Crafting.GetInstance().product_ingredients[item]
+					if not has_items(state, goal_ingredients):
+						ingredient_counter += get_important_item_count(inventory, goal_ingredients)
+			# print state
+			return ingredient_counter
 		else:
 			return 0
 
@@ -249,4 +270,6 @@ end = make_initial_state(fin)
 is_goal = make_goal_checker(fin)
 
 print astar.search(Crafting.Graph(), start, is_goal, 1000, make_RIKLS_heuristic(fin))
+
+print astar.end_state
 
