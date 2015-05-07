@@ -176,6 +176,16 @@ def has_items(state, items):
 			return False
 	return True
 
+def has_item(state, item):
+	name, needed = item
+	for item, value in state:
+		if item == name:
+			if value < needed:
+				return False
+			else:
+				return True
+	return False
+
 def next_state(state, produces, consumes):
 	return magic_box(dict(state), produces, consumes)
 
@@ -237,7 +247,7 @@ def make_RIKLS_heuristic(goal):
 				print "State for transition: ", state
 				debug["transitioned"] = True
 			for item in goal:
-				if not has_items(state, {item:goal[item]}):
+				if not has_item(state, (item,goal[item])):
 					goal_ingredients = Crafting.GetInstance().product_ingredients[item]
 					if not has_items(state, goal_ingredients):
 						ingredient_counter += get_important_item_count(inventory, goal_ingredients)
