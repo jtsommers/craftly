@@ -116,7 +116,7 @@ class Crafting:
 				reqs = rule.get('Consumes', {})
 				self.product_ingredients[item] = reqs
 
-		print self.product_ingredients
+		# print self.product_ingredients
 
 	@classmethod
 	def GetInstance(cls):
@@ -197,7 +197,7 @@ def get_important_item_count(inventory, goalInv):
 		return total_items_remaining
 
 
-def make_RIKLS_heuristic(goal):
+def make_RIKLS_heuristic(start, goal):
 	# discourage states with more than the necessary amount of items in inventory
 
 	maximums = defaultdict(lambda: 1)
@@ -219,9 +219,15 @@ def make_RIKLS_heuristic(goal):
 		# print item, p, c
 		# If current inventory is one less than required consumption, we would have to produce another batch
 		# maximums[item] = p + max(c, goal.inventory[item]) - 1
-		maximums[item] = p + max(c, goal.get(item, 0)) - 1
+		mx = p + c - 1
+		g = goal.get(item, 0)
+		# Make sure we can make enough things to get to the goal state
+		while mx < g:
+			mx += p
+		# Account for a potentially higher starting inventory
+		maximums[item] = max(mx, start.get(item, 0))
 
-	print maximums
+	print "Max allowed: ", maximums
 	debug = {}
 
 	def RIKLS_heuristic(state):
@@ -279,7 +285,7 @@ start = make_initial_state(init)
 end = make_initial_state(fin)
 is_goal = make_goal_checker(fin)
 
-print astar.search(Crafting.Graph(), start, is_goal, 1000, make_RIKLS_heuristic(fin))
+print astar.search(Crafting.Graph(), start, is_goal, 1000, make_RIKLS_heuristic(init, fin))
 
 print astar.end_state
 
