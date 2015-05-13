@@ -119,6 +119,41 @@ class Crafting:
 		# print self.product_ingredients
 
 	@classmethod
+	def Maximums(cls, start, goal):
+		instance = cls.GetInstance()
+
+		maximums = defaultdict(lambda: 1)
+		consumes = defaultdict(lambda: 1)
+		produces = defaultdict(lambda: 0)
+
+		for name, rule in instance.Recipes.items():
+			products = rule.get('Produces', {})
+			ingredients = rule.get('Consumes', {})
+			for item, amount in products.items():
+				produces[item] = max(amount, produces[item])
+			for item, amount in ingredients.items():
+				consumes[item] = max(amount, consumes[item])
+
+		# Calculate maximums based on production/consumption
+		for item in produces: # This should cover all the items as you can start from scratch to obtain anything
+			p = produces[item]
+			c = consumes[item]
+			# print item, p, c
+			# If current inventory is one less than required consumption, we would have to produce another batch
+			# maximums[item] = p + max(c, goal.inventory[item]) - 1
+			mx = p + c - 1
+			g = goal.get(item, 0)
+			# Make sure we can make enough things to get to the goal state
+			while mx < g:
+				mx += p
+			# Account for a potentially higher starting inventory
+			maximums[item] = max(mx, start.get(item, 0))
+
+		print "Max allowed: ", maximums
+		return (maximums, consumes, produces)
+
+
+	@classmethod
 	def GetInstance(cls):
 		if not cls.instance:
 			cls.instance = cls()
@@ -164,8 +199,6 @@ def magic_box(items = {}, produces = {}, consumes = {}):
 		amount = items.get(item, 0) - consumes.get(item, 0) + produces.get(item, 0)
 		state.append((item, amount))
 	return tuple(state)
-
-empty_state = magic_box()
 		
 def has_items(state, items):
 	# print "state: ", state
@@ -199,35 +232,8 @@ def get_important_item_count(inventory, goalInv):
 
 def make_RIKLS_heuristic(start, goal):
 	# discourage states with more than the necessary amount of items in inventory
-
-	maximums = defaultdict(lambda: 1)
-	consumes = defaultdict(lambda: 1)
-	produces = defaultdict(lambda: 0)
-
-	for name, rule in Crafting.Recipes().items():
-		products = rule.get('Produces', {})
-		ingredients = rule.get('Consumes', {})
-		for item, amount in products.items():
-			produces[item] = max(amount, produces[item])
-		for item, amount in ingredients.items():
-			consumes[item] = max(amount, consumes[item])
-
-	# Calculate maximums based on production/consumption
-	for item in produces: # This should cover all the items as you can start from scratch to obtain anything
-		p = produces[item]
-		c = consumes[item]
-		# print item, p, c
-		# If current inventory is one less than required consumption, we would have to produce another batch
-		# maximums[item] = p + max(c, goal.inventory[item]) - 1
-		mx = p + c - 1
-		g = goal.get(item, 0)
-		# Make sure we can make enough things to get to the goal state
-		while mx < g:
-			mx += p
-		# Account for a potentially higher starting inventory
-		maximums[item] = max(mx, start.get(item, 0))
-
-	print "Max allowed: ", maximums
+	maximums, consumes, produces = Crafting.Maximums(start, goal)
+	
 	debug = {}
 
 	def RIKLS_heuristic(state):
@@ -248,7 +254,7 @@ def make_RIKLS_heuristic(start, goal):
 		elif not is_goal(state):
 			inventory = dict(state)
 			# Take a look at the first state to reach all the necessary tools
-			if "transitioned" not in debug:
+			if False:#"transitioned" not in debug:
 				print "TRANSITIONED TO ITEM INSPECTION"
 				print "State for transition: ", state
 				debug["transitioned"] = True
@@ -264,10 +270,6 @@ def make_RIKLS_heuristic(start, goal):
 
 	return RIKLS_heuristic
 
-def make_goal_heuristic(goal):
-	pass
-
-
 
 def make_initial_state(inventory):
 	# Do something to make a state
@@ -278,14 +280,64 @@ def make_goal_checker(goal):
 		return has_items(state, goal)
 	return is_goal
 
+def make_tool_goal_checker(goal):
+	def is_goal(state):
+		tool_counter = 0
+		for item in goal:
+			tool_counter += tool_check.get(item, lambda x:0)(state)
+		return tool_counter == 0
+	return is_goal
+
 init = Crafting.Initial()
 fin = Crafting.Goal()
+
+maximums, max_consumes, max_produces = Crafting.Maximums(init, fin)
 
 start = make_initial_state(init)
 end = make_initial_state(fin)
 is_goal = make_goal_checker(fin)
 
-print astar.search(Crafting.Graph(), start, is_goal, 1000, make_RIKLS_heuristic(init, fin))
+full_path = []
+total_cost = 0
 
-print astar.end_state
+# Create subgoals for the planner to search
+# First goal, get all necessary tools
+is_goal = make_tool_goal_checker(fin)
+cost, path = astar.search(Crafting.Graph(), start, is_goal, 1000, make_RIKLS_heuristic(init, fin))
+full_path.extend(path)
+total_cost += cost
+start = astar.end_state
+
+# Look for one item at a time
+subgoal = Counter()
+for item in fin:
+	amount = fin[item]
+	chunk = max_produces[item]
+	while amount > 0:
+		subgoal[item] += chunk
+		print "Searching for subgoal: ", subgoal
+		is_goal = make_goal_checker(subgoal)
+		cost, path = astar.search(Crafting.Graph(), start, is_goal, 1000, make_RIKLS_heuristic(init, subgoal))
+		if cost > 1000:
+			print "COST OVERFLOW ", subgoal
+		full_path.extend(path)
+		total_cost += cost
+		start = astar.end_state
+		# Do one chunk of production at a time
+		amount -= chunk
+
+### This shouldn't be necessary, the subgoals should combine in such a way to find the ultimate goal
+# Search for the remaining goal starting from previous subgoal
+# is_goal = make_goal_checker(fin)
+# cost, path = astar.search(Crafting.Graph(), start, is_goal, 1000, make_RIKLS_heuristic(init, fin))
+# full_path.extend(path)
+# total_cost += cost
+
+print "Total cost: ", total_cost
+print "Action path: ", full_path
+print "Final Inventory: ", astar.end_state
+
+# print astar.search(Crafting.Graph(), start, is_goal, 1000, make_RIKLS_heuristic(init, fin))
+
+# print astar.end_state
 
