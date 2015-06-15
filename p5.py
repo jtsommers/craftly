@@ -207,12 +207,14 @@ class Crafting:
 	def RequirementsForItem(cls, item):
 		instance = cls.GetInstance()
 
-def magic_box(items = {}, produces = {}, consumes = {}):
+def magic_box(item_state, produces = {}, consumes = {}):
 	item_list = Crafting.Items()
 	state = []
+	itemIndex = 0
 	for item in item_list:
-		amount = items.get(item, 0) - consumes.get(item, 0) + produces.get(item, 0)
+		amount = item_state[itemIndex][1] - consumes.get(item, 0) + produces.get(item, 0)
 		state.append((item, amount))
+		itemIndex += 1
 	return tuple(state)
 		
 def has_items(state, items):
@@ -236,7 +238,7 @@ def has_item(state, item):
 	return False
 
 def next_state(state, produces, consumes):
-	return magic_box(dict(state), produces, consumes)
+	return magic_box(state, produces, consumes)
 
 def get_important_item_count(inventory, goalInv):
 		total_items_remaining = 0
@@ -289,7 +291,12 @@ def make_RIKLS_heuristic(start, goal):
 
 def make_initial_state(inventory):
 	# Do something to make a state
-	return magic_box(inventory)
+	item_list = Crafting.Items()
+	state = []
+	for item in item_list:
+		amount = inventory.get(item, 0)
+		state.append((item, amount))
+	return tuple(state)
 
 def make_goal_checker(goal):
 	def is_goal(state):
