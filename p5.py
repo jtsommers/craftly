@@ -5,6 +5,9 @@ import astar
 Recipe = namedtuple('Recipe', ['name', 'check', 'effect', 'cost'])
 all_recipes = []
 
+file_name = "crafting.json"
+# file_name = "plutonium.json"
+
 # Create a function to check whether a given state has the tools necessary to create a complex item
 # It doesn't check consumable resources since using up resources could be considered progress toward the goal
 def create_tool_check(items):
@@ -94,7 +97,7 @@ class Crafting:
 	def __init__(self):
 		# Parse json into python
 		# Crafting = {"Initial": {}, "Goal":{}, "Items":[], "Recipes":{}}
-		with open('crafting.json') as f:
+		with open(file_name) as f:
 			crafting_data = json.load(f)
 
 		self.crafting_data = crafting_data
@@ -302,37 +305,39 @@ total_cost = 0
 
 # Create subgoals for the planner to search
 # First goal, get all necessary tools
-is_goal = make_tool_goal_checker(fin)
-cost, path = astar.search(Crafting.Graph(), start, is_goal, 1000, make_RIKLS_heuristic(init, fin))
-full_path.extend(path)
-total_cost += cost
-start = astar.end_state
+if file_name == "crafting.json":
+	is_goal = make_tool_goal_checker(fin)
+	cost, path = astar.search(Crafting.Graph(), start, is_goal, 1000, make_RIKLS_heuristic(init, fin))
+	full_path.extend(path)
+	total_cost += cost
+	start = astar.end_state
 
-# Look for one item at a time
-subgoal = Counter()
-for item in fin:
-	amount = fin[item]
-	chunk = max_produces[item]
-	while amount > 0:
-		subgoal[item] += chunk
-		print "Searching for subgoal: ", subgoal
-		is_goal = make_goal_checker(subgoal)
-		cost, path = astar.search(Crafting.Graph(), start, is_goal, 1000, make_RIKLS_heuristic(init, subgoal))
-		if cost > 1000:
-			print "COST OVERFLOW ", subgoal
-		full_path.extend(path)
-		total_cost += cost
-		start = astar.end_state
-		# Do one chunk of production at a time
-		amount -= chunk
+	# Look for one item at a time
+	subgoal = Counter()
+	for item in fin:
+		amount = fin[item]
+		chunk = max_produces[item]
+		while amount > 0:
+			subgoal[item] += chunk
+			print "Searching for subgoal: ", subgoal
+			is_goal = make_goal_checker(subgoal)
+			cost, path = astar.search(Crafting.Graph(), start, is_goal, 1000, make_RIKLS_heuristic(init, subgoal))
+			if cost > 1000:
+				print "COST OVERFLOW ", subgoal
+			full_path.extend(path)
+			total_cost += cost
+			start = astar.end_state
+			# Do one chunk of production at a time
+			amount -= chunk
+else:
+	# Search for the remaining goal starting from previous subgoal
+	is_goal = make_goal_checker(fin)
+	cost, path = astar.search(Crafting.Graph(), start, is_goal, 1000, make_RIKLS_heuristic(init, fin))
+	full_path.extend(path)
+	total_cost += cost
 
-### This shouldn't be necessary, the subgoals should combine in such a way to find the ultimate goal
-# Search for the remaining goal starting from previous subgoal
-# is_goal = make_goal_checker(fin)
-# cost, path = astar.search(Crafting.Graph(), start, is_goal, 1000, make_RIKLS_heuristic(init, fin))
-# full_path.extend(path)
-# total_cost += cost
-
+print ""
+print "=== FINAL RESULTS ==="
 print "Total cost: ", total_cost
 print "Action path: ", full_path
 print "Final Inventory: ", astar.end_state
