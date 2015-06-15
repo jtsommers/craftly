@@ -249,48 +249,34 @@ def get_important_item_count(inventory, goalInv):
 
 
 def make_RIKLS_heuristic(start, goal):
-	# discourage states with more than the necessary amount of items in inventory
+	# Discourage states with more than the necessary amount of items in inventory
 	maximums, consumes, produces = Crafting.Maximums(start, goal)
-	
-	debug = {}
 
 	def RIKLS_heuristic(state):
 		tool_counter = 0
 		ingredient_counter = 0
+
+		# Prune states with more than max necessary amount of an item
 		for item, amount in state:
 			if amount > maximums[item]:
 				return float("inf")
 		# return 0
-
-		# Doesn't help enough yet
-		for item in goal:
-			tool_counter += tool_check.get(item, lambda x:0)(state)
 		
-		if tool_counter > 0:
-			# print tool_counter
-			return 20*tool_counter
-		elif not is_goal(state):
-			inventory = dict(state)
-			# Take a look at the first state to reach all the necessary tools
-			if False:#"transitioned" not in debug:
-				print "TRANSITIONED TO ITEM INSPECTION"
-				print "State for transition: ", state
-				debug["transitioned"] = True
-			for item in goal:
-				if not has_item(state, (item,goal[item])):
-					goal_ingredients = Crafting.GetInstance().product_ingredients[item]
-					if not has_items(state, goal_ingredients):
-						ingredient_counter += get_important_item_count(inventory, goal_ingredients)
-			# print state
-			return ingredient_counter
-		else:
-			return 0
+		inventory = dict(state)
+
+		for item in goal:
+			if not has_item(state, (item,goal[item])):
+				goal_ingredients = Crafting.GetInstance().product_ingredients[item]
+				if not has_items(state, goal_ingredients):
+					ingredient_counter += get_important_item_count(inventory, goal_ingredients)
+		# print state
+		return ingredient_counter
 
 	return RIKLS_heuristic
 
 
 def make_initial_state(inventory):
-	# Do something to make a state
+	# Create a state tuple from the starting inventory dictionary
 	item_list = Crafting.Items()
 	state = []
 	for item in item_list:
