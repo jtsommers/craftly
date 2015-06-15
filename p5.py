@@ -103,6 +103,13 @@ class Crafting:
 		self.crafting_data = crafting_data
 		self.Initial = crafting_data['Initial']
 		self.Items = crafting_data['Items']
+
+		self.ItemMap = {}
+		itemIndex = 0;
+		for itemName in self.Items:
+			self.ItemMap[itemName] = itemIndex
+			itemIndex += 1
+		
 		self.Goal = crafting_data['Goal']
 		self.Recipes = crafting_data['Recipes']
 		self.all_recipes = []
@@ -168,6 +175,11 @@ class Crafting:
 		return instance.Items
 
 	@classmethod
+	def ItemMap(cls):
+		instance = cls.GetInstance()
+		return instance.ItemMap
+
+	@classmethod
 	def Recipes(cls):
 		instance = cls.GetInstance()
 		return instance.Recipes
@@ -206,9 +218,10 @@ def magic_box(items = {}, produces = {}, consumes = {}):
 def has_items(state, items):
 	# print "state: ", state
 	# print "item_state: ", item_state
-	item_state = magic_box(items)
-	for i in range(len(state)):
-		if state[i][1] < item_state[i][1]:
+	for itemName in items:
+		itemAmount = items[itemName]
+		itemIndex = Crafting.ItemMap()[itemName]
+		if state[itemIndex][1] < itemAmount:
 			return False
 	return True
 
